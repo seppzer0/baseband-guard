@@ -61,19 +61,6 @@ jobs:
     name: Build Check - ${{ matrix.kernel_config.android_version }} (Kernel ${{ matrix.kernel_config.kernel_version }})
     
     steps:
-      - name: Maximize Build Space
-        uses: AdityaGarg8/remove-unwanted-software@v5
-        with:
-          remove-dotnet: 'true'          # Frees ~2 GB
-          remove-android: 'true'         # Frees ~9 GB
-          remove-haskell: 'true'         # Frees ~5.2 GB
-          remove-codeql: 'true'          # Frees ~5.4 GB
-          remove-docker-images: 'true'   # Frees ~3.2 GB
-          remove-large-packages: 'true'  # Frees ~3.1 GB
-          remove-swapfile: 'true'        # Frees ~4 GB
-          remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          verbose: 'true'                # Enable detailed logging
-
       - name: Set CONFIG Environment Variable
         run: |
           # Set CONFIG dynamically based on matrix values
@@ -89,6 +76,27 @@ jobs:
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
           mkdir -p "$CONFIG"
+
+      - name: Config ccache
+        run: |
+          echo "CCACHE_DIR=$HOME/.ccache_6.6.66" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
+          echo "Current Disk space:"
+          df -h
+          echo "Current kernel: "
+          echo ${{ env.CONFIG }}
+          rm -rf kernel_workspace
+          mkdir kernel_workspace
+
+      - name: 载入当前版本内核的 ccache缓存
+        uses: actions/cache@v4
+        id: ccache-restore
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ env.CONFIG }}-${{ runner.os }}-main
+          restore-keys: |
+            ccache-${{ env.CONFIG }}-${{ runner.os }}-
+            ccache-${{ env.CONFIG }}-
 
       - name: Get Baseband-guard Source
         uses: actions/checkout@v4
