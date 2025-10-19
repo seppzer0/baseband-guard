@@ -61,6 +61,16 @@ jobs:
     name: Build Check - ${{ matrix.kernel_config.android_version }} (Kernel ${{ matrix.kernel_config.kernel_version }})
     
     steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+
       - name: Set CONFIG Environment Variable
         run: |
           # Set CONFIG dynamically based on matrix values
@@ -76,51 +86,13 @@ jobs:
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
           mkdir -p "$CONFIG"
-          sudo apt-get install -y ccache
 
-      - name: Config ccache
-        run: |
-          echo "CCACHE_DIR=$HOME/.ccache_6.6.66" >> $GITHUB_ENV
-          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
-          echo "Current Disk space:"
-          df -h
-          echo "Current kernel: "
-          echo ${{ env.CONFIG }}
-          rm -rf kernel_workspace
-          mkdir kernel_workspace
-
-      - name: Restore ccache for ${{ env.CONFIG }}
-        uses: actions/cache@v4
-        id: ccache-restore
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
         with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ env.CONFIG }}-${{ runner.os }}-main
-          restore-keys: |
-            ccache-${{ env.CONFIG }}-${{ runner.os }}-
-            ccache-${{ env.CONFIG }}-
-
-      - name: Init and config ccache
-        run: |
-          export CCACHE_COMPILERCHECK="none"
-          export CCACHE_BASEDIR="${{ github.workspace }}"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="${{ env.CCACHE_MAXSIZE }}"
-          
-          mkdir -p "$CCACHE_DIR"
-          
-          echo "config ccache size to: $CCACHE_MAXSIZE"
-          ccache -M "$CCACHE_MAXSIZE"
-          ccache -o compression=true
-          
-          echo "ccache original state:"
-          ccache -s
-          
-          if [ "${{ steps.ccache-restore.outputs.cache-hit }}" == 'true' ]; then
-            echo "ccache triggered:"
-            ccache -sv
-          fi
+          key: gki-kernel-${{ env.CONFIG }}
+          max-size: 3G
+          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Get Baseband-guard Source
         uses: actions/checkout@v4
